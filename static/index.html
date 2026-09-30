@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Annamitra | Urban Surplus Food Rescue & Redistribution Platform</title>
+
+  <!-- Tailwind CSS & Lucide Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Leaflet CSS & JS (Free OpenStreetMap mapping, no API key required) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col font-sans">
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-[9999] flex flex-col space-y-2 max-w-sm w-full"></div>
+
+  <!-- TOP NAVIGATION HEADER -->
+  <header class="bg-emerald-950 text-white shadow-md sticky top-0 z-50 border-b border-emerald-900">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
+      
+      <!-- Brand & Title -->
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('dashboard')">
+        <div class="w-10 h-10 rounded-xl bg-emerald-700 flex items-center justify-center border border-emerald-500 shadow-inner">
+          <i data-lucide="utensils" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-xl font-extrabold tracking-tight text-white flex items-center">
+              🍱 ANNAMITRA
+            </h1>
+            <span class="px-2 py-0.5 text-[10px] font-bold bg-emerald-800 text-emerald-200 rounded-md border border-emerald-600 uppercase">
+              Hackathon Edition
+            </span>
+          </div>
+          <p class="text-[11px] text-emerald-300">Urban Institutional Surplus Food Rescue Engine • Bengaluru</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex items-center space-x-1 bg-emerald-900/70 p-1 rounded-xl text-xs border border-emerald-800 overflow-x-auto">
+        <button id="nav-tab-dashboard" onclick="switchTab('dashboard')" class="px-3 py-1.5 rounded-lg font-semibold bg-emerald-600 text-white transition flex items-center space-x-1">
+          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
+          <span>Dashboard</span>
+        </button>
+        <button id="nav-tab-donations" onclick="switchTab('donations')" class="px-3 py-1.5 rounded-lg font-medium text-slate-300 hover:text-white transition flex items-center space-x-1">
+          <i data-lucide="package" class="w-3.5 h-3.5"></i>
+          <span>Donations</span>
+        </button>
+        <button id="nav-tab-routes" onclick="switchTab('routes')" class="px-3 py-1.5 rounded-lg font-medium text-slate-300 hover:text-white transition flex items-center space-x-1">
+          <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
+          <span>Routes</span>
+        </button>
+        <button id="nav-tab-deliveries" onclick="switchTab('deliveries')" class="px-3 py-1.5 rounded-lg font-medium text-slate-300 hover:text-white transition flex items-center space-x-1">
+          <i data-lucide="bike" class="w-3.5 h-3.5"></i>
+          <span>Deliveries</span>
+        </button>
+        <button id="nav-tab-impact" onclick="switchTab('impact')" class="px-3 py-1.5 rounded-lg font-medium text-slate-300 hover:text-white transition flex items-center space-x-1">
+          <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>
+          <span>Impact</span>
+        </button>
+        <button id="nav-tab-reports" onclick="switchTab('reports')" class="px-3 py-1.5 rounded-lg font-medium text-slate-300 hover:text-white transition flex items-center space-x-1">
+          <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+          <span>NAAC Hub</span>
+        </button>
+        <button id="nav-tab-users" onclick="switchTab('users')" class="px-3 py-1.5 rounded-lg font-medium text-slate-300 hover:text-white transition flex items-center space-x-1">
+          <i data-lucide="users" class="w-3.5 h-3.5"></i>
+          <span>Actors</span>
+        </button>
+      </nav>
+
+      <!-- Quick Role Switcher (Crucial for 4-person Hackathon Demo) -->
+      <div class="flex items-center space-x-2">
+        <div class="bg-emerald-900 border border-emerald-700 rounded-xl px-2.5 py-1.5 flex items-center space-x-2">
+          <span class="text-[11px] text-emerald-300 font-medium hidden sm:inline">Role:</span>
+          <select id="role-selector" onchange="switchUserRole(this.value)" class="bg-transparent text-xs font-bold text-white outline-none cursor-pointer">
+            <option value="donor" class="text-slate-900">👨🍳 BMSIT Mess (Donor)</option>
+            <option value="receiver" class="text-slate-900">🏢 Hospital Hub (Receiver)</option>
+            <option value="volunteer" class="text-slate-900">🚴 Ravi Kumar (Volunteer)</option>
+            <option value="admin" class="text-slate-900">👨💼 Dr. Ananya (Admin)</option>
+          </select>
+        </div>
+
+        <button id="nav-post-food-btn" onclick="openModal('modal-post-donation')" class="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl shadow transition flex items-center space-x-1">
+          <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+          <span>Post Food</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ROLE CONTEXTUAL BANNER -->
+  <div class="bg-emerald-800 text-emerald-100 text-xs py-2 px-4 border-b border-emerald-700">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <span class="pulse-beacon"></span>
+        <span id="role-banner-text"><b>Donor Mode:</b> Log surplus food batches from campus mess. Track remaining pickup windows.</span>
+      </div>
+      <div class="hidden sm:flex items-center space-x-2 text-[11px]">
+        <span class="text-emerald-300">Active Actor:</span>
+        <span id="header-user-name" class="font-bold text-white">BMSIT College Mess</span>
+        <span class="px-1.5 py-0.5 bg-emerald-900 text-emerald-200 rounded text-[10px] uppercase font-bold" id="header-user-role">DONOR</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP CONTAINER -->
+  <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
+
+    <!-- ============================================================== -->
+    <!-- VIEW 1: 🏠 DASHBOARD -->
+    <!-- ============================================================== -->
+    <section id="view-dashboard" class="space-y-6">
+      
+      <!-- KPI Counters Bar (Calculated directly from Database) -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover-card">
+          <div class="flex items-center justify-between text-slate-400 mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider">Meals Rescued</span>
+            <i data-lucide="utensils" class="w-4 h-4 text-emerald-600"></i>
+          </div>
+          <h3 id="kpi-meals-rescued" class="text-2xl font-black text-slate-900">12,450</h3>
+          <p class="text-[10px] text-emerald-600 mt-1 font-semibold">● Fresh meals served</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover-card">
+          <div class="flex items-center justify-between text-slate-400 mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider">Food Saved</span>
+            <i data-lucide="scale" class="w-4 h-4 text-emerald-600"></i>
+          </div>
+          <h3 id="kpi-food-saved" class="text-2xl font-black text-emerald-800">3,240 kg</h3>
+          <p class="text-[10px] text-slate-500 mt-1 font-semibold">Diverted from waste</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover-card">
+          <div class="flex items-center justify-between text-slate-400 mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider">Donations</span>
+            <i data-lucide="handshake" class="w-4 h-4 text-blue-600"></i>
+          </div>
+          <h3 id="kpi-successful-donations" class="text-2xl font-black text-slate-900">486</h3>
+          <p class="text-[10px] text-slate-500 mt-1 font-semibold">Verified batches</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover-card">
+          <div class="flex items-center justify-between text-slate-400 mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider">People Served</span>
+            <i data-lucide="users" class="w-4 h-4 text-purple-600"></i>
+          </div>
+          <h3 id="kpi-people-served" class="text-2xl font-black text-slate-900">9,850</h3>
+          <p class="text-[10px] text-slate-500 mt-1 font-semibold">Hospital & shelter</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover-card">
+          <div class="flex items-center justify-between text-slate-400 mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider">CO₂e Avoided</span>
+            <i data-lucide="leaf" class="w-4 h-4 text-emerald-600"></i>
+          </div>
+          <h3 id="kpi-co2e-avoided" class="text-2xl font-black text-slate-900">8,100 kg</h3>
+          <p class="text-[10px] text-emerald-600 mt-1 font-semibold">2.5 × kg standard</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover-card">
+          <div class="flex items-center justify-between text-slate-400 mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider">Waste Fee Saved</span>
+            <i data-lucide="indian-rupee" class="w-4 h-4 text-amber-600"></i>
+          </div>
+          <h3 id="kpi-waste-cost-saved" class="text-2xl font-black text-slate-900">₹ 12,960</h3>
+          <p class="text-[10px] text-slate-500 mt-1 font-semibold">Municipal tipping</p>
+        </div>
+      </div>
+
+      <!-- Live Spatial Route & Distribution Map (Bengaluru) -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-slate-100 gap-2">
+          <div>
+            <h2 class="text-base font-bold text-slate-900 flex items-center">
+              <i data-lucide="map" class="w-5 h-5 mr-2 text-emerald-700"></i>
+              Live Urban Redistribution Network (Bengaluru)
+            </h2>
+            <p class="text-xs text-slate-500">Real-time GPS mapping of institutional donors, consolidated volunteer routes, and drop hubs</p>
+          </div>
+          <div class="flex items-center space-x-3 text-xs">
+            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block mr-1"></span> Donor Mess</span>
+            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-md bg-purple-600 inline-block mr-1"></span> Drop Hub</span>
+            <span class="flex items-center"><span class="w-3 border-t-2 border-dashed border-emerald-600 inline-block mr-1"></span> Clustered Route</span>
+          </div>
+        </div>
+
+        <div id="map"></div>
+      </div>
+
+      <!-- Active Donations Pipeline Table -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+        <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Active Rescue Pipeline</h3>
+            <p class="text-xs text-slate-500">Live monitor of posted surplus, volunteer dispatches, and receiver verifications</p>
+          </div>
+          <button onclick="refreshAllData()" class="px-3 py-1.5 text-xs text-slate-600 hover:text-emerald-700 border border-slate-200 rounded-lg flex items-center space-x-1 transition">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>Refresh</span>
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                <th class="py-2.5 px-4">Batch ID</th>
+                <th class="py-2.5 px-4">Food Item</th>
+                <th class="py-2.5 px-4">Quantity</th>
+                <th class="py-2.5 px-4">Servings</th>
+                <th class="py-2.5 px-4">Pickup Window</th>
+                <th class="py-2.5 px-4">Status</th>
+                <th class="py-2.5 px-4 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="dashboard-donations-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- VIEW 2: 🍱 DONATIONS (DONOR & RECEIVER BROWSER) -->
+    <!-- ============================================================== -->
+    <section id="view-donations" class="hidden space-y-6">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div>
+          <h2 class="text-xl font-bold text-slate-900">Surplus Food Registry</h2>
+          <p class="text-xs text-slate-500">Available food donations prioritized by Safe Consumption Deadline, Quantity, and Distance</p>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="openModal('modal-post-donation')" class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-xl shadow-sm transition flex items-center space-x-1.5">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            <span>POST SURPLUS FOOD</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Priority Badges Legend -->
+      <div class="flex flex-wrap items-center gap-2 p-3 bg-slate-100 rounded-xl text-xs text-slate-600">
+        <span class="font-bold text-slate-700 mr-2">Priority Criteria:</span>
+        <span class="px-2 py-0.5 rounded badge-urgent font-bold text-[10px]">🟥 URGENT (&lt; 60m deadline)</span>
+        <span class="px-2 py-0.5 rounded badge-high font-bold text-[10px]">🟧 HIGH (&lt; 2h deadline)</span>
+        <span class="px-2 py-0.5 rounded badge-medium font-bold text-[10px]">🟨 MEDIUM (&lt; 4h deadline)</span>
+        <span class="px-2 py-0.5 rounded badge-low font-bold text-[10px]">🟩 LOW</span>
+      </div>
+
+      <!-- Donations Cards Grid -->
+      <div id="donations-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Dynamically rendered via renderDonations() -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="donations-empty-state" class="hidden p-12 text-center bg-white rounded-2xl border border-slate-200">
+        <i data-lucide="package-open" class="w-12 h-12 mx-auto text-slate-300 mb-3"></i>
+        <h4 class="text-base font-bold text-slate-700">No active surplus batches open</h4>
+        <p class="text-xs text-slate-400 mt-1">Post a surplus meal donation to initiate immediate rescue.</p>
+      </div>
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- VIEW 3: 📍 ROUTES (ROUTE CLUSTERING ENGINE) -->
+    <!-- ============================================================== -->
+    <section id="view-routes" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded uppercase tracking-wider">Spatial Optimization</span>
+          <h2 class="text-xl font-bold text-slate-900 mt-1.5">Consolidated Volunteer Routes</h2>
+          <p class="text-xs text-slate-500">Nearby surplus batches within <b>1.5 km radius</b> grouped via Haversine calculation to minimize transport emissions.</p>
+        </div>
+        <button onclick="fetchRoutes()" class="px-3.5 py-2 border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-semibold text-slate-700 flex items-center space-x-1.5 transition">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span>Re-cluster</span>
+        </button>
+      </div>
+
+      <div id="routes-container" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <!-- Dynamically populated with route clusters -->
+      </div>
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- VIEW 4: 🚴 DELIVERIES (VOLUNTEER & RECEIVER HANDOFF) -->
+    <!-- ============================================================== -->
+    <section id="view-deliveries" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
+        <div>
+          <h2 class="text-xl font-bold text-slate-900">Active Delivery Dispatches</h2>
+          <p class="text-xs text-slate-500">Track handover temperatures, transit status, and receiver confirmations</p>
+        </div>
+      </div>
+
+      <div id="deliveries-container" class="space-y-4">
+        <!-- Dynamically populated -->
+      </div>
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- VIEW 5: 📊 IMPACT & ANALYTICS DASHBOARD -->
+    <!-- ============================================================== -->
+    <section id="view-impact" class="hidden space-y-6">
+      
+      <!-- Environmental & Financial Summary Box -->
+      <div class="bg-gradient-to-r from-emerald-900 to-teal-900 text-white p-6 md:p-8 rounded-2xl shadow-md flex flex-col md:flex-row justify-between items-center gap-6">
+        <div class="space-y-2">
+          <span class="px-2.5 py-1 bg-emerald-800/90 text-emerald-200 text-[10px] font-bold rounded uppercase tracking-wider">Statutory Verification Engine</span>
+          <h2 class="text-2xl font-black">Environmental & Community Impact Log</h2>
+          <p class="text-xs text-emerald-100 max-w-2xl leading-relaxed">
+            Standard Conversion Methodology: <b>1 kg food diverted ≈ 2.5 kg CO₂e avoided</b> (UNEP food waste coefficient) and <b>₹ 4.00/kg municipal wet-waste tipping bill reduction</b>. Real-time calculations derived from verified deliveries.
+          </p>
+        </div>
+        <button onclick="downloadNaacReport()" class="whitespace-nowrap px-6 py-3.5 bg-white hover:bg-emerald-50 text-emerald-950 font-bold text-xs rounded-xl shadow transition flex items-center space-x-2">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>DOWNLOAD AUDIT PDF</span>
+        </button>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 class="text-sm font-bold text-slate-900 mb-1">Cumulative Food Rescue Trajectory (kg)</h3>
+          <p class="text-xs text-slate-400 mb-4">Historical weighment records across Bangalore campus network</p>
+          <div class="h-64">
+            <canvas id="chart-rescue-trend"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 class="text-sm font-bold text-slate-900 mb-1">Beneficiary Demographic Allocation</h3>
+          <p class="text-xs text-slate-400 mb-4">Proportion of meals delivered to verified vulnerable groups</p>
+          <div class="h-64">
+            <canvas id="chart-beneficiaries"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- VIEW 6: 📄 REPORTS (NAAC & IMPACT HUB) -->
+    <!-- ============================================================== -->
+    <section id="view-reports" class="hidden space-y-6">
+      <div class="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+        
+        <div class="border-b border-slate-100 pb-5">
+          <span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded uppercase tracking-wider">NAAC Criterion 7.1.3 & Institutional Social Responsibility</span>
+          <h2 class="text-xl font-bold text-slate-900 mt-2">NAAC & Campus Sustainability Impact Hub</h2>
+          <p class="text-xs text-slate-500 mt-1 max-w-2xl">
+            Colleges and educational institutions can generate official vector PDF audit dockets documenting campus food-waste diversion, volunteer participation, and carbon reduction metrics.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Select Registered Institution</label>
+            <select id="naac-institution-select" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Reporting Period</label>
+            <input type="text" readonly value="Academic Cycle 2025–2026 / Institutional CSR Docket" class="w-full bg-slate-100 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 outline-none">
+          </div>
+        </div>
+
+        <!-- Official Disclaimer -->
+        <div class="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 leading-relaxed">
+          <p><b>Statutory Disclaimer:</b> The generated PDF dossier serves as an authentic institutional social-responsibility activity record and campus waste-audit log. Annamitra's prototype calculations and operational safeguards do not claim or guarantee statutory NAAC accreditation or replace independent municipal regulatory audits.</p>
+        </div>
+
+        <div class="pt-2 flex justify-end">
+          <button onclick="downloadNaacReport()" class="px-6 py-3.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow transition flex items-center space-x-2">
+            <i data-lucide="file-check-2" class="w-4 h-4"></i>
+            <span>GENERATE OFFICIAL NAAC AUDIT REPORT (PDF)</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- VIEW 7: 👤 USERS & ACTOR DIRECTORY (ADMIN) -->
+    <!-- ============================================================== -->
+    <section id="view-users" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
+        <div>
+          <h2 class="text-xl font-bold text-slate-900">Registered Platform Actors</h2>
+          <p class="text-xs text-slate-500">Admin oversight: verify donors, receivers and student volunteers</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="text-[11px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
+                <th class="py-3 px-4">Name</th>
+                <th class="py-3 px-4">Email</th>
+                <th class="py-3 px-4">Role</th>
+                <th class="py-3 px-4">Phone</th>
+                <th class="py-3 px-4">Verification</th>
+                <th class="py-3 px-4 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="users-table-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+
+  <!-- ============================================================== -->
+  <!-- MODAL 1: POST SURPLUS FOOD -->
+  <!-- ============================================================== -->
+  <div id="modal-post-donation" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 md:p-8 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+      
+      <div class="flex justify-between items-center pb-4 mb-5 border-b border-slate-100">
+        <div class="flex items-center space-x-3">
+          <div class="p-2.5 bg-emerald-50 text-emerald-800 rounded-xl">
+            <i data-lucide="chef-hat" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-slate-900">Post Surplus Kitchen Food</h3>
+            <p class="text-xs text-slate-500">Step 1 — Donor broadcasts surplus meal batch</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modal-post-donation')" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-post-donation" onsubmit="handlePostDonationSubmit(event)" class="space-y-4">
+        
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Food Item & Menu Breakdown</label>
+          <input type="text" id="post-food-name" required value="Vegetable Rice & Dal Tadka" placeholder="e.g. Rice + Dal + Curry" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Meal Window</label>
+            <select id="post-meal-type" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="LUNCH" selected>Lunch Surplus</option>
+              <option value="DINNER">Dinner Surplus</option>
+              <option value="BREAKFAST">Breakfast Surplus</option>
+              <option value="SNACKS">High-Tea / Snacks</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Dietary Classification</label>
+            <select id="post-dietary-type" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="VEG" selected>100% Vegetarian (Universal)</option>
+              <option value="NON_VEG">Non-Vegetarian</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Quantity / Weight (kg)</label>
+            <input type="number" step="0.5" id="post-quantity-kg" required value="30.0" oninput="calculateServingsFromKg(this.value)" placeholder="30.0" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Approximate Servings</label>
+            <input type="number" id="post-servings" required value="100" placeholder="100" class="w-full bg-slate-100 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-emerald-800 outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Safe Pickup Window (Hours)</label>
+            <input type="number" step="0.5" id="post-deadline-hours" required value="2.0" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Pickup Location</label>
+            <input type="text" id="post-pickup-location" required value="BMSIT College Campus Gate 1, Yelahanka" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+        </div>
+
+        <!-- Food Safety Undertaking -->
+        <div class="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs space-y-2">
+          <label class="flex items-start space-x-2 cursor-pointer">
+            <input type="checkbox" required checked class="mt-0.5 rounded text-emerald-600">
+            <span class="text-slate-700"><b>Sensory Quality Check:</b> Food is freshly prepared, hygienically kept, and passes odor, temperature and visual sensory tests.</span>
+          </label>
+        </div>
+
+        <div class="pt-3 flex justify-end space-x-3">
+          <button type="button" onclick="closeModal('modal-post-donation')" class="px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold transition">Cancel</button>
+          <button type="submit" class="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-sm transition">BROADCAST SURPLUS</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ============================================================== -->
+  <!-- MODAL 2: VOLUNTEER PICKUP & TEMPERATURE CHECK -->
+  <!-- ============================================================== -->
+  <div id="modal-pickup-verification" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 md:p-8 shadow-2xl border border-slate-200">
+      
+      <div class="flex justify-between items-center pb-4 mb-4 border-b border-slate-100">
+        <div class="flex items-center space-x-2.5">
+          <div class="p-2 bg-emerald-50 text-emerald-800 rounded-xl">
+            <i data-lucide="thermometer" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Food Safety Temperature Log</h3>
+            <p class="text-xs text-slate-500">Step 2 & 5 — Operational Safeguard Verification</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modal-pickup-verification')" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-pickup-verify" onsubmit="handleConfirmPickupSubmit(event)" class="space-y-4">
+        
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Measured Food Temperature (°C)</label>
+          <input type="number" step="0.5" id="pickup-temperature-input" required value="64.5" oninput="validateLiveTemperature()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none">
+        </div>
+
+        <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+          <span class="font-medium text-slate-700">Food Type Classification:</span>
+          <label class="flex items-center space-x-2 cursor-pointer font-bold text-emerald-800">
+            <input type="checkbox" id="pickup-is-hot-food" checked onchange="validateLiveTemperature()" class="rounded text-emerald-600">
+            <span>Hot Cooked Food (≥ 60°C)</span>
+          </label>
+        </div>
+
+        <!-- Live Safety Validation Warning/Notice Box -->
+        <div id="pickup-temperature-alert" class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-medium">
+          ✅ Compliant: Temperature satisfies FSSAI hot-holding operational guidelines (≥ 60°C).
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Digital Handoff / Photo Proof (Optional)</label>
+          <input type="text" id="pickup-proof-input" value="https://annamitra.org/proofs/thermal_probe_64C.jpg" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs text-slate-600 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Transit Notes</label>
+          <input type="text" id="pickup-notes-input" placeholder="e.g. Insulated thermal carrier secured" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs outline-none">
+        </div>
+
+        <div class="pt-3 flex justify-end space-x-3">
+          <button type="button" onclick="closeModal('modal-pickup-verification')" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold transition">Cancel</button>
+          <button type="submit" class="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-sm transition">LOG PICKUP & START TRANSIT</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ============================================================== -->
+  <!-- MODAL 3: RECEIVER CONFIRMATION -->
+  <!-- ============================================================== -->
+  <div id="modal-receiver-confirm" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 md:p-8 shadow-2xl border border-slate-200">
+      
+      <div class="flex justify-between items-center pb-4 mb-4 border-b border-slate-100">
+        <div class="flex items-center space-x-2.5">
+          <div class="p-2 bg-amber-50 text-amber-800 rounded-xl">
+            <i data-lucide="clipboard-check" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Confirm Delivery & Impact</h3>
+            <p class="text-xs text-slate-500">Step 7 — Receiver verifies actual portions</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modal-receiver-confirm')" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-receiver-confirm" onsubmit="handleReceiverConfirmSubmit(event)" class="space-y-4">
+        
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Actual Quantity Received (kg)</label>
+          <input type="number" step="0.5" id="confirm-received-kg" required value="28.0" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Number of Meals Distributed</label>
+          <input type="number" id="confirm-meals-distributed" required value="95" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Beneficiary Notes / Demographic</label>
+          <input type="text" id="confirm-notes" value="Distributed to 95 patient caretakers at Hospital Gate 2." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs outline-none">
+        </div>
+
+        <div class="pt-3 flex justify-end space-x-3">
+          <button type="button" onclick="closeModal('modal-receiver-confirm')" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold transition">Cancel</button>
+          <button type="submit" class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-sm transition">CONFIRM & COMPLETE RESCUE</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- FOOTER & REGULATORY DISCLAIMER (SECTION 21) -->
+  <footer class="bg-white border-t border-slate-200 py-6 mt-12">
+    <div class="max-w-7xl mx-auto px-4 text-center space-y-2">
+      <p class="text-xs font-semibold text-slate-700">
+        🍱 Annamitra — Urban Surplus Food Rescue & Redistribution Platform • Hackathon Prototype
+      </p>
+      <p class="text-[11px] text-slate-400 max-w-3xl mx-auto leading-relaxed">
+        «Food must be handled, transported and distributed according to applicable food-safety requirements. Annamitra's prototype checks are operational safeguards and do not replace applicable regulations or professional food-safety procedures.»
+      </p>
+    </div>
+  </footer>
+
+  <!-- Core JavaScript Logic -->
+  <script src="/static/script.js"></script>
+</body>
+</html>
