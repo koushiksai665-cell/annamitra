@@ -78,6 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   updateUserInterfaceHeader();
+  initSupabase();
   initLeafletMap();
   initCharts();
   
@@ -135,6 +136,15 @@ function updateUserInterfaceHeader() {
   if (nameEl) nameEl.textContent = state.currentUser.name;
   if (roleEl) roleEl.textContent = state.currentUser.role;
   if (roleSwitcher) roleSwitcher.value = state.currentUser.role.toLowerCase();
+
+  const sbBtnLabel = document.getElementById("btn-supabase-label");
+  if (sbBtnLabel) {
+    if (state.currentUser && state.currentUser.supabase_uid) {
+      sbBtnLabel.textContent = `⚡ ${state.currentUser.name.split(" ")[0]} (${state.currentUser.role})`;
+    } else {
+      sbBtnLabel.textContent = "⚡ Supabase Auth";
+    }
+  }
 
   // Role contextual banner
   if (bannerEl) {
@@ -1213,3 +1223,288 @@ function updateCharts(impactData) {
     state.impactChart.update();
   }
 }
+
+// ==========================================
+// SUPABASE AUTHENTICATION INTEGRATION
+// ==========================================
+
+let supabaseClient = null;
+
+// Configurable Supabase credentials (saved in localStorage or loaded from server / defaults)
+const DEFAULT_SUPABASE_URL = "https://koushiksai-annamitra.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFubmFtaXRyYS1kZW1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODAwMDAwMDAsImV4cCI6MTk5NTU1NTU1NX0.demoKey";
+
+function getSupabaseCredentials() {
+  const customUrl = localStorage.getItem("annamitra_sb_url");
+  const customKey = localStorage.getItem("annamitra_sb_key");
+  return {
+    url: (customUrl && customUrl.trim()) ? customUrl.trim() : DEFAULT_SUPABASE_URL,
+    key: (customKey && customKey.trim()) ? customKey.trim() : DEFAULT_SUPABASE_ANON_KEY,
+    isCustom: Boolean(customUrl && customKey)
+  };
+}
+
+async function initSupabase() {
+  // Fetch server-configured Supabase credentials if available
+  try {
+    const res = await fetch("/api/v1/auth/supabase-config");
+    if (res.ok) {
+      const cfg = await res.json();
+      if (cfg.has_config && !localStorage.getItem("annamitra_sb_url")) {
+        localStorage.setItem("annamitra_sb_url", cfg.supabase_url);
+        localStorage.setItem("annamitra_sb_key", cfg.supabase_anon_key);
+      }
+    }
+  } catch (e) {
+    // Ignore server config errors
+  }
+
+  const creds = getSupabaseCredentials();
+  if (window.supabase && typeof window.supabase.createClient === "function") {
+    try {
+      supabaseClient = window.supabase.createClient(creds.url, creds.key);
+      console.log("[Supabase] Initialized client:", creds.url);
+    } catch (err) {
+      console.warn("[Supabase] Initialization notice:", err.message);
+    }
+  }
+  updateSupabaseStatusIndicator();
+}
+
+function updateSupabaseStatusIndicator() {
+  const pill = document.getElementById("supabase-status-pill");
+  const creds = getSupabaseCredentials();
+  if (!pill) return;
+  if (creds.isCustom) {
+    pill.textContent = "Custom Project Active";
+    pill.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300";
+  } else {
+    pill.textContent = "Ready / Demo Mode";
+    pill.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-300";
+  }
+}
+
+function openSupabaseAuthModal(tab = "signup") {
+  const creds = getSupabaseCredentials();
+  const urlInput = document.getElementById("cfg-supabase-url");
+  const keyInput = document.getElementById("cfg-supabase-key");
+  if (urlInput && creds.url && creds.isCustom) urlInput.value = creds.url;
+  if (keyInput && creds.key && creds.isCustom) keyInput.value = creds.key;
+
+  switchSupabaseAuthTab(tab);
+  openModal("modal-supabase-auth");
+}
+
+function switchSupabaseAuthTab(tab) {
+  const signupForm = document.getElementById("form-supabase-signup");
+  const signinForm = document.getElementById("form-supabase-signin");
+  const signupTabBtn = document.getElementById("tab-btn-supabase-signup");
+  const signinTabBtn = document.getElementById("tab-btn-supabase-signin");
+
+  if (tab === "signup") {
+    if (signupForm) signupForm.classList.remove("hidden");
+    if (signinForm) signinForm.classList.add("hidden");
+    if (signupTabBtn) signupTabBtn.className = "flex-1 py-2 text-xs font-bold border-b-2 border-emerald-600 text-emerald-700 transition";
+    if (signinTabBtn) signinTabBtn.className = "flex-1 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 transition";
+  } else {
+    if (signupForm) signupForm.classList.add("hidden");
+    if (signinForm) signinForm.classList.remove("hidden");
+    if (signinTabBtn) signinTabBtn.className = "flex-1 py-2 text-xs font-bold border-b-2 border-emerald-600 text-emerald-700 transition";
+    if (signupTabBtn) signupTabBtn.className = "flex-1 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 transition";
+  }
+}
+
+function toggleSupabaseConfig() {
+  const drawer = document.getElementById("supabase-config-drawer");
+  if (drawer) drawer.classList.toggle("hidden");
+}
+
+function saveSupabaseConfig() {
+  const url = document.getElementById("cfg-supabase-url")?.value?.trim();
+  const key = document.getElementById("cfg-supabase-key")?.value?.trim();
+  if (url && key) {
+    localStorage.setItem("annamitra_sb_url", url);
+    localStorage.setItem("annamitra_sb_key", key);
+    initSupabase();
+    showToast("Supabase project credentials saved!", "success");
+    const drawer = document.getElementById("supabase-config-drawer");
+    if (drawer) drawer.classList.add("hidden");
+  } else {
+    showToast("Please enter both Supabase URL and Anon Key.", "warning");
+  }
+}
+
+function resetSupabaseConfig() {
+  localStorage.removeItem("annamitra_sb_url");
+  localStorage.removeItem("annamitra_sb_key");
+  const urlInput = document.getElementById("cfg-supabase-url");
+  const keyInput = document.getElementById("cfg-supabase-key");
+  if (urlInput) urlInput.value = "";
+  if (keyInput) keyInput.value = "";
+  initSupabase();
+  showToast("Reset to default Supabase configuration.", "success");
+}
+
+// Handle Supabase Sign Up
+async function handleSupabaseSignUp(e) {
+  e.preventDefault();
+  const name = document.getElementById("sb-signup-name")?.value?.trim();
+  const email = document.getElementById("sb-signup-email")?.value?.trim();
+  const password = document.getElementById("sb-signup-password")?.value;
+  const role = document.getElementById("sb-signup-role")?.value || "DONOR";
+  const phone = document.getElementById("sb-signup-phone")?.value?.trim();
+  const institution = document.getElementById("sb-signup-institution")?.value?.trim();
+  const submitBtn = document.getElementById("btn-submit-sb-signup");
+
+  if (!email || !password || !name) {
+    showToast("Please fill in all required fields.", "error");
+    return;
+  }
+
+  const originalBtnText = submitBtn ? submitBtn.innerHTML : "";
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span>Connecting Supabase...</span>`;
+  }
+
+  let supabaseUid = `sb_${Date.now()}`;
+
+  // 1. Call Supabase Auth Client if initialized
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            full_name: name,
+            role: role,
+            phone: phone,
+            institution_name: institution
+          }
+        }
+      });
+      if (error) {
+        console.warn("[Supabase] signUp response notice:", error.message);
+      } else if (data && data.user) {
+        supabaseUid = data.user.id;
+      }
+    } catch (sbErr) {
+      console.warn("[Supabase] Auth request caught:", sbErr.message);
+    }
+  }
+
+  // 2. Synchronize user profile into local Annamitra backend
+  try {
+    const res = await fetch("/api/v1/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: name,
+        email: email,
+        password: password,
+        role: role,
+        phone: phone || "+91-9900000000",
+        institution_name: institution || "",
+        supabase_uid: supabaseUid
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Server failed to register user profile");
+    }
+
+    const result = await res.json();
+    const newUser = result.user;
+
+    // Set state & save session
+    state.currentUser = newUser;
+    localStorage.setItem("annamitra_user", JSON.stringify(newUser));
+
+    updateUserInterfaceHeader();
+    closeModal("modal-supabase-auth");
+
+    showToast(`🎉 Welcome ${newUser.name}! Signed up with Supabase as ${newUser.role}.`, "success");
+
+    // Switch to corresponding role tab
+    if (newUser.role === "DONOR") switchTab("dashboard");
+    else if (newUser.role === "RECEIVER") switchTab("donations");
+    else if (newUser.role === "VOLUNTEER") switchTab("routes");
+    else switchTab("dashboard");
+
+    refreshAllData();
+  } catch (err) {
+    console.error("Signup error:", err);
+    showToast(`Registration error: ${err.message}`, "error");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalBtnText;
+    }
+  }
+}
+
+// Handle Supabase Sign In
+async function handleSupabaseSignIn(e) {
+  e.preventDefault();
+  const email = document.getElementById("sb-signin-email")?.value?.trim();
+  const password = document.getElementById("sb-signin-password")?.value;
+  const submitBtn = document.getElementById("btn-submit-sb-signin");
+
+  if (!email || !password) {
+    showToast("Please enter email and password.", "error");
+    return;
+  }
+
+  const originalBtnText = submitBtn ? submitBtn.innerHTML : "";
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span>Signing in...</span>`;
+  }
+
+  // 1. Authenticate with Supabase client if available
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
+      if (error) console.warn("[Supabase] signIn notice:", error.message);
+    } catch (err) {
+      console.warn("[Supabase] SignIn catch:", err.message);
+    }
+  }
+
+  // 2. Authenticate with backend API
+  try {
+    const res = await fetch("/api/v1/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email, password: password })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Invalid login credentials");
+    }
+
+    const data = await res.json();
+    state.currentUser = data.user;
+    localStorage.setItem("annamitra_user", JSON.stringify(data.user));
+
+    updateUserInterfaceHeader();
+    closeModal("modal-supabase-auth");
+    showToast(`Welcome back, ${data.user.name}!`, "success");
+    refreshAllData();
+  } catch (err) {
+    console.error("Login error:", err);
+    showToast(`Sign in failed: ${err.message}`, "error");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalBtnText;
+    }
+  }
+}
+

@@ -20,6 +20,7 @@ from clustering import (
     match_best_drop_point
 )
 from pdf_generator import generate_naac_certificate_pdf
+import auth
 
 # Ensure database tables exist
 models.Base.metadata.create_all(bind=engine)
@@ -166,7 +167,102 @@ def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
             "phone": user.phone,
             "verification_status": user.verification_status,
             "institution_id": user.institution_id,
-            "institution_name": user.institution.name if user.institution else None
+            "institution_name": user.institution.name if user.institution else None,
+            "supabase_uid": getattr(user, "supabase_uid", None)
+        }
+    }
+
+
+@app.get("/api/v1/auth/supabase-config")
+def get_supabase_config():
+    """Returns configured Supabase public URL and Anon Key if available from environment."""
+    return {
+        "supabase_url": os.getenv("SUPABASE_URL", ""),
+        "supabase_anon_key": os.getenv("SUPABASE_ANON_KEY", ""),
+        "has_config": bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_ANON_KEY"))
+    }
+
+
+@app.post("/auth/signup", status_code=status.HTTP_201_CREATED)
+@app.post("/api/v1/auth/signup", status_code=status.HTTP_201_CREATED)
+def signup(payload: schemas.UserCreate, db: Session = Depends(get_db)):
+    """Registers a new user and syncs Supabase authenticated accounts."""
+    existing = db.query(models.User).filter(models.User.email == payload.email).first()
+    if existing:
+        if payload.supabase_uid:
+            existing.supabase_uid = payload.supabase_uid
+        if payload.name and payload.name != existing.name:
+            existing.name = payload.name
+        if payload.phone and payload.phone != existing.phone:
+            existing.phone = payload.phone
+        db.commit()
+        db.refresh(existing)
+        return {
+            "status": "success",
+            "message": "User profile synced and logged in.",
+            "user": {
+                "id": existing.id,
+                "name": existing.name,
+                "email": existing.email,
+                "role": existing.role.value if hasattr(existing.role, "value") else str(existing.role),
+                "phone": existing.phone,
+                "verification_status": existing.verification_status,
+                "institution_id": existing.institution_id,
+                "institution_name": existing.institution.name if existing.institution else None,
+                "supabase_uid": existing.supabase_uid
+            }
+        }
+
+    # If institutional donor and institution_name provided without id, create institution
+    inst_id = payload.institution_id
+    if not inst_id and payload.institution_name and payload.institution_name.strip():
+        inst = models.Institution(
+            name=payload.institution_name.strip(),
+            type="College Mess" if payload.role == "DONOR" else "Community Hub",
+            address="Bengaluru, Karnataka",
+            latitude=12.9716,
+            longitude=77.5946,
+            verification_status="VERIFIED"
+        )
+        db.add(inst)
+        db.commit()
+        db.refresh(inst)
+        inst_id = inst.id
+
+    hashed_pw = auth.hash_password(payload.password) if payload.password else "supabase_managed"
+
+    # Map role safely
+    role_str = payload.role.upper() if payload.role else "DONOR"
+    if role_str not in [r.value for r in models.UserRole]:
+        role_str = "DONOR"
+
+    new_user = models.User(
+        name=payload.name.strip(),
+        email=payload.email.strip().lower(),
+        password=hashed_pw,
+        role=models.UserRole(role_str),
+        phone=payload.phone or "+91-9900000000",
+        institution_id=inst_id,
+        verification_status="VERIFIED",
+        supabase_uid=payload.supabase_uid
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return {
+        "status": "success",
+        "message": "Account created and registered successfully.",
+        "user": {
+            "id": new_user.id,
+            "name": new_user.name,
+            "email": new_user.email,
+            "role": new_user.role.value if hasattr(new_user.role, "value") else str(new_user.role),
+            "phone": new_user.phone,
+            "verification_status": new_user.verification_status,
+            "institution_id": new_user.institution_id,
+            "institution_name": new_user.institution.name if new_user.institution else None,
+            "supabase_uid": new_user.supabase_uid
         }
     }
 

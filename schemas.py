@@ -10,10 +10,12 @@ class UserLogin(BaseModel):
 class UserCreate(BaseModel):
     name: str
     email: str
-    password: str
-    role: str
-    phone: str
+    password: Optional[str] = "supabase_managed"
+    role: str = "DONOR"
+    phone: Optional[str] = ""
     institution_id: Optional[int] = None
+    institution_name: Optional[str] = None
+    supabase_uid: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: int
@@ -23,6 +25,8 @@ class UserResponse(BaseModel):
     phone: str
     verification_status: str
     institution_id: Optional[int] = None
+    institution_name: Optional[str] = None
+    supabase_uid: Optional[str] = None
     created_at: datetime
 
     class Config:

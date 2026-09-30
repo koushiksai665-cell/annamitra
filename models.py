@@ -74,6 +74,7 @@ class User(Base):
     phone: Mapped[str] = mapped_column(String(50), nullable=False)
     verification_status: Mapped[str] = mapped_column(String(50), default="VERIFIED")
     institution_id: Mapped[Optional[int]] = mapped_column(ForeignKey("institutions.id"), nullable=True)
+    supabase_uid: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships
